@@ -4,11 +4,20 @@ const CATEGORY_API = "https://dummyjson.com/products/categories";
 const productsContainer = document.querySelector("#products-container")
 const categoryFilters = document.querySelector("#category-filters")
 const searchInput = document.querySelector("#search-input")
+const wishlistCount = document.querySelector("#wishlist-count")
+const cartCount = document.querySelector("#cart-count")
 
 let allCategories = []
 
 function formatCategory(category) {
   return category.replace("-", " ")
+}
+
+function getItem(key) {
+  return JSON.parse(localStorage.getItem(key)) || [];
+}
+function setItem(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
 }
 
 async function fetchProducts(url) {
@@ -19,7 +28,7 @@ async function fetchProducts(url) {
   renderProducts(data.products)
 }
 
-function convertToINR(price){
+function convertToINR(price) {
   return Math.round(price * 96.29)
 }
 
@@ -60,7 +69,7 @@ function renderProducts(products) {
       productsContainer.append(article)
     })
   } else {
-    productsContainer.innerHTML = "Purchase from another Store"
+    productsContainer.innerHTML = "Bete , Kahi or se lele..."
   }
 
 }
@@ -126,7 +135,11 @@ async function loadProductPage() {
   const response = await fetch(url);
   const data = await response.json();
 
-  const {thumbnail, category, price, rating, reviews, title, description } = data
+  if (data.message) {
+    productDetailContainer.innerHTML = "Failed to load product details"
+  }
+
+  const { thumbnail, category, price, rating, reviews, title, description } = data
 
   const div = `<div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
         
@@ -242,18 +255,187 @@ async function loadProductPage() {
 
   productDetailContainer.innerHTML = div
 
+  const addToWishlistBtn = document.querySelector("#add-to-wishlist-btn");
+  const addToCartBtn = document.querySelector("#add-to-cart-btn");
+  addToWishlistBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    const wishlistProducts = getItem("wishlist")
+    if (wishlistProducts.length) {
+      const isExist = wishlistProducts.some(p => p.id === data.id);
+      if (!isExist) {
+        setItem("wishlist", [data, ...wishlistProducts])
+      }
+    } else {
+      setItem("wishlist", [data])
+    }
+
+    updateWishlistCount()
+  });
+
+   addToCartBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    addToCart(data)
+
+    // const cartProducts = getItem("cart")
+    // if (cartProducts.length) {
+    //   const isExist = cartProducts.some(p => p.id === data.id);
+    //   if (!isExist) {
+    //     setItem("cart", [data, ...cartProducts])
+    //   }
+    // } else {
+    //   setItem("cart", [data])
+    // }
+
+    // updateCartCount()
+  });
 }
 
-loadProductPage()
+loadProductPage();
+
+
+function loadWishListPage() {
+  const wishlistContainer = document.querySelector("#wishlist-container");
+  if (!wishlistContainer) {
+    return;
+  }
+
+  const wishlistProducts = getItem("wishlist");
+
+  const outerDiv = document.createElement("div")
+  outerDiv.className = "bg-white border border-slate-200 rounded-lg divide-y divide-slate-200 overflow-hidden shadow-sm"
+
+  if (!wishlistProducts.length) {
+    wishlistContainer.innerHTML = `
+    <div class="bg-white border border-slate-200 rounded-lg p-12 text-center max-w-md mx-auto my-8">
+        <div class="w-16 h-16 mx-auto mb-4 text-slate-300 flex items-center justify-center">
+          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-slate-800 mb-2">Your wishlist is empty</h2>
+        <p class="text-slate-500 text-sm mb-6">Looks like you haven't saved any products to your wishlist yet.</p>
+        <a href="index.html" class="inline-flex items-center justify-center bg-teal-700 hover:bg-teal-800 text-white font-medium px-6 py-2.5 rounded-md transition text-sm">
+          Start Shopping
+        </a>
+      </div>
+    `;
+
+    return
+  }
+
+  wishlistContainer.innerHTML = ""
+
+  wishlistProducts.forEach((data) => {
+    const { id, title, thumbnail, price } = data
+    const div = document.createElement("div");
+    div.className = "p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 justify-between"
+
+    const card = `<div class="flex items-center gap-4 w-full sm:w-auto flex-1 min-w-0">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-white border border-slate-200 rounded p-1.5 flex items-center justify-center shrink-0">
+              <img 
+                src=${thumbnail}
+                alt=${title}
+                class="max-h-full max-w-full object-contain"
+              >
+            </div>
+            <div class="min-w-0 flex-1">
+              <a 
+                href="product-details.html?id=${id}" 
+                class="text-sm font-semibold text-slate-900 hover:text-teal-700 line-clamp-2 transition" 
+                title=${title}>
+                ${title}
+              </a>
+              <p class="text-sm font-bold text-slate-900 mt-1">${convertToINR(price)}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
+            <button type="button"
+            data-id=${id} 
+              class="wishlist-add-cart-btn inline-flex items-center justify-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium py-2 px-4 rounded transition shadow-sm">
+            
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+              </svg>
+              <span>Add to Cart</span>
+            </button>
+            <button 
+              type="button"
+              data-id=${id} 
+              class="wishlist-remove-btn inline-flex items-center justify-center gap-1.5 text-slate-500 hover:text-red-600 border border-slate-300 hover:border-red-300 text-sm font-medium py-2 px-3 rounded transition"
+              title="Remove from Wishlist"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              <span>Remove from Wishlist</span>
+            </button>
+          </div>`
+
+    div.innerHTML = card;
+    outerDiv.append(div)
+  });
+
+  wishlistContainer.append(outerDiv);
+
+  wishlistContainer.addEventListener("click", (e) => {
+    e.stopPropagation()
+
+    const removeWishlistBtn = e.target.closest(".wishlist-remove-btn")
+    const addToCartBtn = e.target.closest(".wishlist-add-cart-btn")
+    if (removeWishlistBtn) {
+      const removeProductId = Number(removeWishlistBtn.dataset.id);
+      const filterProducts = getItem("wishlist").filter(({ id }) => id !== removeProductId);
+      setItem("wishlist", filterProducts)
+      updateWishlistCount()
+      loadWishListPage()
+    }
+    if (addToCartBtn) {
+      const productId = Number(addToCartBtn.dataset.id);
+      const data = getItem("wishlist").find(({id}) => id === productId)
+      addToCart(data)
+    }
+  })
+}
+
+
+function addToCart(data){
+  const cartProducts = getItem("cart")
+    if (cartProducts.length) {
+      const isExist = cartProducts.some(p => p.id === data.id);
+      if (!isExist) {
+        setItem("cart", [data, ...cartProducts])
+      }
+    } else {
+      setItem("cart", [data])
+    }
+
+    updateCartCount()
+}
+
+loadWishListPage()
 
 if (productsContainer) {
   fetchProducts(API)
   fetchCategories()
 }
 
-function init() {
-
+function updateWishlistCount() {
+  wishlistCount.textContent = getItem("wishlist").length
 }
 
+updateWishlistCount()
 
-init()
+function updateCartCount() {
+  cartCount.textContent = getItem("cart").length
+}
+
+updateCartCount()
+
+// function init() {
+
+// }
+
+
+// init()
